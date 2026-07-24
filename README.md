@@ -18,11 +18,16 @@ never leaves your machine.
 - **Stack up to four visualizers** and place each one anywhere on the canvas
   (position + scale per instance) to build split-screen and picture-in-picture
   compositions — placement survives the export path exactly
-- **Eight audio-reactive shader backgrounds** (WebGL2) — gradient flow, fbm
-  noise field, aurora, water ripples that propagate from each onset, a
-  synthwave neon grid, and nature-geometry patterns (hex lattice, topographic
-  contour lines, voronoi cells) — plus solid color and your own image, all
-  with a static-grain control (no temporal shimmer in exports)
+- **Twelve audio-reactive backgrounds** — gradient flow, fbm noise field,
+  aurora, water ripples that propagate from each onset, a synthwave neon grid,
+  nature-geometry patterns (hex lattice, topographic contour lines, voronoi
+  cells), plus **three true-3D sci-fi scenes** rendered with real perspective,
+  normals and distance fog: a **hyperspace corridor** (analytic ray↔cylinder,
+  panelled walls, light bands racing past), a **Menger-sponge megastructure**
+  (raymarched alien architecture that reconfigures with the music) and an
+  infinite **crystal lattice** you fly through — plus solid color, your own
+  image, and an animated **pixel-art sprite loop** (see
+  [docs/pixel-art-prompts.md](docs/pixel-art-prompts.md))
 - **Fluid preview** — feature sampling supports fractional frames, so a
   30 fps project animates at full display refresh in the studio while export
   still renders exact integer frames

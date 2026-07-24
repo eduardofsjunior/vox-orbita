@@ -18,7 +18,7 @@ import { smoothedAt } from '../types';
 import { hash01 } from '../prng';
 import { defineLayer, hexToRgb01, resolveColor, type RenderCtx, type Schema } from './api';
 
-const COMMON = `#version 300 es
+export const COMMON = `#version 300 es
 precision highp float;
 uniform vec2 uRes;
 uniform float uTime;
@@ -260,14 +260,25 @@ void main() {
   outColor = vec4(grain(col, vUv), 1.0);
 }`;
 
-interface ShaderBgOptions {
+export interface ShaderBgOptions {
   intensity?: number;
   grain?: number;
   /** Per-frame extra uniforms (e.g. onset-driven ripples). Deterministic! */
   extraUniforms?: (rc: RenderCtx) => Record<string, number | number[] | Float32Array>;
+  /**
+   * Extra slider/toggle controls for this shader. Each key `foo` is bound to
+   * a `uFoo` uniform automatically (booleans become 0/1), so a 3D scene can
+   * expose things like march quality or fractal fold without new plumbing.
+   */
+  extraSchema?: Schema;
 }
 
-function makeShaderBg(id: string, frag: string, opts?: ShaderBgOptions) {
+/** Uniform name for an extra schema key: `fold` → `uFold`. */
+function uniformName(key: string): string {
+  return `u${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+}
+
+export function makeShaderBg(id: string, frag: string, opts?: ShaderBgOptions) {
   const schema = {
     colorA: { kind: 'color', def: 'theme:a' },
     colorB: { kind: 'color', def: 'theme:b' },
@@ -278,7 +289,9 @@ function makeShaderBg(id: string, frag: string, opts?: ShaderBgOptions) {
     reactivity: { kind: 'slider', min: 0, max: 1, step: 0.01, def: 0.65 },
     smoothing: { kind: 'slider', min: 0, max: 1, step: 0.01, def: 0.3 },
     grain: { kind: 'slider', min: 0, max: 1, step: 0.01, def: opts?.grain ?? 0.3 },
+    ...(opts?.extraSchema ?? {}),
   } satisfies Schema;
+  const extraKeys = Object.keys(opts?.extraSchema ?? {});
   return defineLayer({
     id,
     kind: 'background',
@@ -329,6 +342,12 @@ function makeShaderBg(id: string, frag: string, opts?: ShaderBgOptions) {
         uColBg: hexToRgb01(resolveColor(cfg.base, theme)),
         uIntensity: cfg.intensity,
         uGrain: cfg.grain * 0.03,
+        ...Object.fromEntries(
+          extraKeys.map((k) => {
+            const v = (cfg as Record<string, unknown>)[k];
+            return [uniformName(k), typeof v === 'boolean' ? (v ? 1 : 0) : (v as number)];
+          }),
+        ),
         ...(opts?.extraUniforms ? opts.extraUniforms(rc) : {}),
       });
       glr.blit(c2);

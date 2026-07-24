@@ -6,6 +6,8 @@
 
 import type { LayerDef } from './layers/api';
 import { bgSolid, bgImage } from './layers/bg-basic';
+import { bgHyperspace, bgLattice3d, bgMegastructure } from './layers/bg-3d';
+import { bgSprite } from './layers/bg-sprite';
 import {
   bgAurora,
   bgContour,
@@ -40,6 +42,10 @@ export const BACKGROUNDS: readonly LayerDef[] = [
   bgHex,
   bgContour,
   bgVoronoi,
+  bgHyperspace,
+  bgMegastructure,
+  bgLattice3d,
+  bgSprite,
   bgSolid,
   bgImage,
 ];

@@ -113,6 +113,29 @@ export function smoothedAt(arr: Float32Array, frameCount: number, frame: number,
   return sum / (end - start + 1);
 }
 
+/**
+ * How many onsets have occurred up to (and including) `frame`.
+ * Backed by a lazily-built prefix sum cached per FeatureTrack, so callers can
+ * use it every frame without going quadratic on long files. Deterministic:
+ * a pure function of the track and the frame index.
+ */
+const onsetPrefixCache = new WeakMap<Uint8Array, Uint32Array>();
+
+export function onsetCountAt(f: FeatureTrack, frame: number): number {
+  let prefix = onsetPrefixCache.get(f.onsets);
+  if (!prefix) {
+    prefix = new Uint32Array(f.frameCount);
+    let acc = 0;
+    for (let i = 0; i < f.frameCount; i++) {
+      acc += f.onsets[i];
+      prefix[i] = acc;
+    }
+    onsetPrefixCache.set(f.onsets, prefix);
+  }
+  const i = Math.min(Math.max(Math.floor(frame), 0), f.frameCount - 1);
+  return prefix[i];
+}
+
 export function rmsAt(f: FeatureTrack, frame: number): number {
   return sampleLerp(f.rms, f.frameCount, frame);
 }
