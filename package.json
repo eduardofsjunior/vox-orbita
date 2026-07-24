@@ -1,0 +1,31 @@
+{
+  "name": "vox-orbita",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Vox Orbita — turn voice notes and podcasts into shareable MP4 videos with audio-reactive 2D and 3D visuals. 100% client-side.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 4173 --strictPort",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e": "playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "^5.2.5",
+    "@fontsource-variable/jetbrains-mono": "^5.2.5",
+    "@fontsource-variable/space-grotesk": "^5.2.5",
+    "@huggingface/transformers": "^3.8.1",
+    "mp4-muxer": "^5.2.1"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.10.2",
+    "@playwright/test": "^1.54.0",
+    "typescript": "~5.9.2",
+    "vite": "^7.0.0",
+    "vitest": "^3.2.0"
+  }
+}
