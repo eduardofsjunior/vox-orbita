@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   activeLineAt,
   activeWordIndex,
+  applyEditedText,
   groupWords,
+  toEditableText,
   toVtt,
   wordCount,
   type CaptionTrack,
@@ -84,5 +86,84 @@ describe('toVtt', () => {
     expect(vtt.startsWith('WEBVTT')).toBe(true);
     expect(vtt).toContain('00:00:01.500 --> 00:00:03.250');
     expect(vtt).toContain('hello world');
+  });
+});
+
+// ---------------------------------------------------------------- editing
+
+const track = (): CaptionTrack => ({
+  language: 'en',
+  lines: [
+    { start: 0, end: 2, text: 'hello wrold', words: [w('hello', 0, 1), w('wrold', 1, 2)] },
+    { start: 2, end: 4, text: 'second line', words: [w('second', 2, 3), w('line', 3, 4)] },
+    { start: 4, end: 6, text: 'third line', words: [w('third', 4, 5), w('line', 5, 6)] },
+  ],
+});
+
+describe('toEditableText', () => {
+  it('renders one caption per row', () => {
+    expect(toEditableText(track())).toBe('hello wrold\nsecond line\nthird line');
+  });
+
+  it('round-trips unchanged text', () => {
+    const t0 = track();
+    const t1 = applyEditedText(t0, toEditableText(t0));
+    expect(t1.lines.map((l) => l.text)).toEqual(t0.lines.map((l) => l.text));
+    expect(t1.lines.map((l) => [l.start, l.end])).toEqual(t0.lines.map((l) => [l.start, l.end]));
+  });
+});
+
+describe('applyEditedText', () => {
+  it('keeps every timing when the row count is unchanged', () => {
+    const t1 = applyEditedText(track(), 'hello world\nsecond line\nthird line');
+    expect(t1.lines[0].text).toBe('hello world');
+    expect(t1.lines.map((l) => [l.start, l.end])).toEqual([[0, 2], [2, 4], [4, 6]]);
+  });
+
+  it('re-derives word timings inside the edited line', () => {
+    const t1 = applyEditedText(track(), 'alpha beta\nsecond line\nthird line');
+    const words = t1.lines[0].words;
+    expect(words.map((x) => x.text)).toEqual(['alpha', 'beta']);
+    // Words stay inside the line and run in order, so karaoke still works.
+    expect(words[0].start).toBe(0);
+    expect(words[words.length - 1].end).toBeCloseTo(2);
+    expect(words[0].end).toBeLessThanOrEqual(words[1].start);
+  });
+
+  it('drops only the blanked caption and leaves neighbours untouched', () => {
+    const t1 = applyEditedText(track(), 'hello wrold\n\nthird line');
+    expect(t1.lines.map((l) => l.text)).toEqual(['hello wrold', 'third line']);
+    expect(t1.lines.map((l) => [l.start, l.end])).toEqual([[0, 2], [4, 6]]);
+  });
+
+  it('collapses stray whitespace', () => {
+    const t1 = applyEditedText(track(), '  hello   world  \nsecond line\nthird line');
+    expect(t1.lines[0].text).toBe('hello world');
+  });
+
+  it('re-spreads timing over the same span when rows are added', () => {
+    const t1 = applyEditedText(track(), 'a\nb\nc\nd');
+    expect(t1.lines).toHaveLength(4);
+    // Still bounded by the original track, and still monotonic.
+    expect(t1.lines[0].start).toBe(0);
+    expect(t1.lines[3].end).toBeCloseTo(6);
+    for (let i = 1; i < t1.lines.length; i++) {
+      expect(t1.lines[i].start).toBeGreaterThanOrEqual(t1.lines[i - 1].end - 1e-9);
+    }
+  });
+
+  it('returns an empty track when everything is deleted', () => {
+    expect(applyEditedText(track(), '').lines).toEqual([]);
+  });
+
+  it('preserves the language tag', () => {
+    expect(applyEditedText(track(), 'x\ny\nz').language).toBe('en');
+  });
+
+  it('keeps the edited track renderable and exportable', () => {
+    const t1 = applyEditedText(track(), 'hello world\nsecond line\nthird line');
+    expect(activeLineAt(t1, 0.5)?.text).toBe('hello world');
+    expect(wordCount(t1)).toBe(6);
+    expect(toVtt(t1)).toContain('hello world');
   });
 });

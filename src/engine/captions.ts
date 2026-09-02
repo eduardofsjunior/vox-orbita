@@ -103,6 +103,83 @@ export function activeWordIndex(line: CaptionLine, time: number): number {
   return idx;
 }
 
+/**
+ * The track as editable plain text — one caption line per row.
+ *
+ * Timings deliberately aren't shown: they're what transcription is good at and
+ * hand-typing them is error prone. Row position is the link back to the
+ * original line, which is what `applyEditedText` uses to preserve timing.
+ */
+export function toEditableText(track: CaptionTrack): string {
+  return track.lines.map((l) => l.text).join('\n');
+}
+
+/**
+ * Spread `text` across [start, end], giving each word a slice proportional to
+ * its length. Re-derived on every edit so the karaoke highlight keeps working
+ * on words the transcriber never saw.
+ */
+function splitWords(text: string, start: number, end: number): CaptionWord[] {
+  const tokens = text.split(/\s+/).filter((tk) => tk.length > 0);
+  if (tokens.length === 0) return [];
+  const total = tokens.reduce((n, tk) => n + tk.length, 0);
+  const span = Math.max(0, end - start);
+  const words: CaptionWord[] = [];
+  let acc = 0;
+  for (const tk of tokens) {
+    const a = start + (acc / total) * span;
+    acc += tk.length;
+    words.push({ text: tk, start: a, end: start + (acc / total) * span });
+  }
+  return words;
+}
+
+/**
+ * Fold edited text back into a track.
+ *
+ * When the row count still matches the track (the usual case — fixing a
+ * misheard word, punctuation, a name), every caption keeps the exact timing
+ * transcription gave it, and blanking a row deletes just that caption while
+ * leaving its neighbours untouched.
+ *
+ * If rows were added or removed the rows no longer line up with the original
+ * captions, so timing is rebuilt: the rows are spread over the same overall
+ * span, weighted by length. Nothing is lost, but individual lines drift — which
+ * is why the UI nudges you to keep one row per caption.
+ */
+export function applyEditedText(base: CaptionTrack, text: string): CaptionTrack {
+  const raw = text.split(/\r?\n/).map((r) => r.replace(/\s+/g, ' ').trim());
+
+  if (raw.length === base.lines.length) {
+    const lines = raw
+      .map((rowText, i) => ({ rowText, src: base.lines[i] }))
+      .filter((p) => p.rowText.length > 0)
+      .map(({ rowText, src }) => ({
+        start: src.start,
+        end: src.end,
+        text: rowText,
+        words: splitWords(rowText, src.start, src.end),
+      }));
+    return { lines, language: base.language };
+  }
+
+  const rows = raw.filter((r) => r.length > 0);
+  if (rows.length === 0) return { lines: [], language: base.language };
+
+  const spanStart = base.lines.length > 0 ? base.lines[0].start : 0;
+  const spanEnd = base.lines.length > 0 ? base.lines[base.lines.length - 1].end : spanStart;
+  const span = Math.max(0, spanEnd - spanStart);
+  const total = rows.reduce((n, r) => n + r.length, 0);
+  let acc = 0;
+  const lines = rows.map((rowText) => {
+    const a = spanStart + (acc / total) * span;
+    acc += rowText.length;
+    const b = spanStart + (acc / total) * span;
+    return { start: a, end: b, text: rowText, words: splitWords(rowText, a, b) };
+  });
+  return { lines, language: base.language };
+}
+
 /** Total number of words across the track. */
 export function wordCount(track: CaptionTrack): number {
   let n = 0;

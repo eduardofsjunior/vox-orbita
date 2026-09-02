@@ -39,7 +39,7 @@ import {
   type FrameRate,
   type ProjectState,
 } from '../engine/project';
-import { toVtt, type CaptionTrack } from '../engine/captions';
+import { applyEditedText, toEditableText, toVtt, type CaptionTrack } from '../engine/captions';
 import { BACKGROUNDS, getLayerDef, OVERLAYS, VISUALIZERS } from '../engine/registry';
 import { demoGroove } from '../engine/testsignal';
 import type { AudioSource, FeatureTrack, ThemeColors, ThemeScope } from '../engine/types';
@@ -971,12 +971,67 @@ export class App {
       );
     }
 
-    return section(t('panel.captions'),
+    const body: HTMLElement[] = [
       el('p', { className: 'panel-hint' }, t('cap.hint')),
       el('div', { className: 'field' }, el('label', {}, t('cap.quality')), modelSelect),
       el('div', { className: 'field' }, el('label', {}, t('cap.language')), langSelect),
       actions,
       el('p', { className: 'caption-status', role: 'status', 'aria-live': 'polite' }, this.transcribeStatus ?? ''),
+    ];
+    if (this.project.captions) body.push(this.buildCaptionEditor(this.project.captions));
+
+    return section(t('panel.captions'), ...body);
+  }
+
+  /**
+   * Editable transcript. One caption per row — keeping the row count means every
+   * caption keeps the timing transcription gave it, so this is for fixing words,
+   * not re-cutting the timing.
+   */
+  private buildCaptionEditor(track: CaptionTrack): HTMLElement {
+    const editor = el('textarea', {
+      className: 'caption-editor',
+      rows: 8,
+      spellcheck: true,
+      'aria-label': t('cap.editLabel'),
+    }) as HTMLTextAreaElement;
+    editor.value = toEditableText(track);
+
+    const status = el('p', { className: 'caption-status edit-status', role: 'status', 'aria-live': 'polite' }, '');
+
+    const save = el('button', {
+      className: 'btn btn-primary btn-small caption-save',
+      onclick: () => {
+        const current = this.project.captions;
+        if (!current) return;
+        const next = applyEditedText(current, editor.value);
+        this.project.captions = next;
+        // The render loop reads project.captions every tick, so an invalidate is
+        // all it takes for the preview to show the edit.
+        this.invalidate();
+        // Re-normalize the box to what was actually stored, so what you see is
+        // what will render (blank rows dropped, whitespace collapsed).
+        editor.value = toEditableText(next);
+        status.textContent = t('cap.saved', { n: String(next.lines.length) });
+      },
+    }, t('cap.save'));
+
+    const revert = el('button', {
+      className: 'btn btn-ghost btn-small',
+      onclick: () => {
+        const current = this.project.captions;
+        if (!current) return;
+        editor.value = toEditableText(current);
+        status.textContent = '';
+      },
+    }, t('cap.revert'));
+
+    return el('div', { className: 'caption-edit' },
+      el('label', { className: 'caption-edit-label' }, t('cap.editLabel')),
+      el('p', { className: 'panel-hint' }, t('cap.editHint')),
+      editor,
+      el('div', { className: 'caption-actions' }, save, revert),
+      status,
     );
   }
 

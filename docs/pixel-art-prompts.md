@@ -1,5 +1,50 @@
 # Pixel-art loop prompts (Higgsfield / any image model)
 
+> **v3 update (2026-07-27) — read this before using the v2 suffix below.**
+> A 40-sheet run (São Paulo / cyberpunk / dungeon sets, 9:16 and 16:9) found
+> three things the v2 suffix is missing. Full write-up in
+> [examples/pixel-loops/README.md](../examples/pixel-loops/README.md).
+> 1. **Name the panel's own shape, not just the grid.** "4 columns × 3 rows"
+>    constrains the grid but not the panel, so the model satisfies "12 panels"
+>    with any tiling — two sheets came back 2×6 and 2×4 with landscape cels.
+>    Adding *"each individual panel must itself be a TALL VERTICAL PORTRAIT
+>    rectangle, clearly taller than it is wide, about 9:16 per panel; do NOT draw
+>    2 columns, do NOT draw wide landscape panels"* gave **32/32 correct grids**.
+>    Invert to "WIDE LANDSCAPE … about 16:9 per panel" for 16:9 sheets. This
+>    supersedes the v2 note that grid drift is an unfixable model quirk.
+> 2. **Lock the palette:** *"the colour palette must be IDENTICAL across all
+>    panels — hue and saturation locked; only brightness may pulse; hue must not
+>    drift."* Kills the colour drift seen in the first batch.
+> 3. **Forbid sheet furniture:** no self-generated title/footer bands (they break
+>    even-division slicing), no per-cel oval vignette, and pin in-scene signage
+>    content so it pulses instead of re-rolling each frame.
+>
+> Also: a **4×4 grid works in either aspect ratio** — sixteen 9:16 cels tile into
+> a 9:16 sheet and sixteen 16:9 cels tile into a 16:9 sheet, no extra maths.
+> And prefer **closed-loop travel** ("exits one edge, re-enters the other,
+> advancing an equal step each panel") over round trips where the subject can
+> move — it produced the most convincing loops by a wide margin.
+
+> **v2 update (continuity pass):** the first batch of six sheets in
+> [examples/pixel-loops/](../examples/pixel-loops/) looked "hit or miss" —
+> some panels didn't connect smoothly to their neighbors, because asking for
+> "the same scene, only animated elements move" lets the model draw each
+> panel as an *independent variation* rather than a true next-frame. Fixed by
+> describing the panels explicitly as **consecutive frames of one continuous
+> animation** (like a traditional exposure sheet), where panel N must be the
+> in-between step after N-1 and before N+1 — small, smooth, constant-speed
+> change only. Also: a motion described as only "turns from A to B" is
+> one-way, so it **snaps** when the loop wraps from the last panel back to the
+> first — say explicitly that it's a **full round-trip cycle within the
+> sheet** unless the motion is naturally cyclic (a tail wag or a breathing
+> glow loops for free; a head turn or a camera pan doesn't). The updated
+> reusable suffix below has both fixes baked in. See
+> [examples/pixel-loops/README.md](../examples/pixel-loops/README.md) for the
+> full list of what worked and didn't across both passes, including the grid
+> count (still often 4×4 instead of the requested 4×3 — harmless, just read
+> the actual grid off the image) and the "hero panel" fix (uniform contact
+> sheet + no cinematic/epic phrasing).
+
 Prompts for generating animated pixel-art backgrounds for the **Pixel loop**
 (`bg-sprite`) background. Read the spec first — the prompts assume it.
 
@@ -32,21 +77,48 @@ produce a clean cycle, generate an **even** frame count and mirror it in the
 app by setting `Frames` to half — or ask for a "ping-pong" motion (out and
 back), which loops by construction.
 
-### Reusable suffix — append to every prompt
+### Reusable suffix v2 — append to every prompt
 
-> Sprite sheet layout: exactly 4 columns by 3 rows, 12 total frames, read
-> left to right then top to bottom. Each cel is 480x270 pixels, 16:9. Every
-> cel shows the SAME scene from the SAME fixed camera — only the animated
-> elements move. Frame 12 must flow seamlessly back into frame 1 (perfect
-> loop). Consistent limited palette of 20 colours across all frames. Crisp
-> pixel-art with hard edges, no anti-aliasing, no blur, no gradients except
-> deliberate dithering. No text, no watermarks, no frame borders or gutters,
-> no drop shadows outside the art. Flat 2D side view.
+Two parts: describe the scene AND its motion first (including whether the
+motion is naturally cyclic or needs an explicit round-trip — see the note
+above), then append this layout block:
+
+> Sprite sheet layout: a uniform comic-book contact sheet grid of exactly 12
+> equally-sized panels, 4 across and 3 down. ALL PANELS EXACTLY THE SAME SIZE
+> — no panel larger than any other, no splash panel, no hero panel. Panels
+> read left to right then top to bottom as CONSECUTIVE FRAMES OF ONE
+> CONTINUOUS ANIMATION, like a traditional hand-drawn animation exposure
+> sheet or a filmstrip: each panel is the very next in-between step after the
+> previous one and the step immediately before the next one. The change from
+> one panel to the next must be small, smooth and constant in speed — no
+> jumps, no skipped motion, no panel that looks unrelated to its neighbors.
+> Panel 12 must be the in-between step that flows seamlessly back into panel
+> 1, completing one continuous loop with no visible seam. Every panel shows
+> the exact SAME scene from the exact SAME fixed camera and framing —
+> background, composition and lighting identical in all 12 panels; only the
+> specifically animated element(s) move. Consistent limited palette of 20
+> colours across all panels. Crisp pixel-art, hard edges, no anti-aliasing,
+> no blur, no gradients except deliberate dithering. No text, no watermarks,
+> no numbers, thin flat divider lines only, no drop shadows outside the art.
+> Flat 2D side view.
+
+If a generation gets flagged by the content filter for no apparent reason,
+try rewording the camera framing (e.g. "three-quarter angle from behind its
+shoulder" instead of "seen from behind") and append "Family-friendly
+[wildlife/whatever] illustration" — worked on the first retry when this
+happened with the eagle.
 
 ### After generating
-1. Check the grid is exact (crop if the model adds margins — gutters break it).
+0. **Set `Sheet format` to `Format B`** in the Pixel loop layer. Model-generated
+   sheets are contact sheets — border around the grid, divider lines between
+   cels, grid a few pixels out of true — so exact even division (`Format A`)
+   slices in the divider and a sliver of the next cel along the top/left edge.
+   Format B trims each cel to its interior; the `Cel trim` slider (default 6%)
+   controls how much. Use `Format A` only for edge-to-edge sheets with no border.
+1. Check the actual grid the model drew (often 4×4, not the requested 4×3)
+   and note it — you'll need the real numbers in step 2.
 2. In Vox Orbita: **Background → Pixel loop → Choose image**, set Columns/Rows/
-   Frames, keep **Pixelated** on.
+   Frames to the REAL grid, keep **Pixelated** on.
 3. Set **Advance** to `Beat` to step one frame per detected beat (the dog wags
    on the downbeat), or `Energy` to speed up as the track gets louder.
 4. Because it's a *background*, keep it low-contrast and dark-ish so the
